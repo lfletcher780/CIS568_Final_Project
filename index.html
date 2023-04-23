@@ -1,0 +1,167 @@
+<html>
+<head>
+    <title>Project</title>
+
+    <script src="https://unpkg.com/deck.gl@latest/dist.min.js"></script>
+    <script src='https://api.tiles.mapbox.com/mapbox-gl-js/v0.53.0/mapbox-gl.js'></script>
+    <link href='https://api.tiles.mapbox.com/mapbox-gl-js/v0.53.0/mapbox-gl.css' rel='stylesheet' />
+
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+
+    <script src="token.js"></script>
+
+    <style>
+        #container {
+            float: top;
+            width: 100vw;
+            height: 80%;
+            margin: 0;
+        }
+        .slider {
+        position: absolute;
+        top: 90%;
+        left: 50%;
+        transform: translate(-50%,-50%);
+        width: 700px;
+        height: 60px;
+        padding: 30px;
+        padding-left: 40px;
+        background: #fcfcfc;
+        border-radius: 20px;
+        display: flex;
+        align-items: center;
+        box-shadow: 0px 15px 40px #7E6D5766;
+        }
+        .slider p {
+        font-size: 26px;
+        font-weight: 600;
+        font-family: Open Sans;
+        padding-left: 30px;
+        color: black;
+        }
+        .slider input[type="range"] {
+        -webkit-appearance:none !important;
+        width: 420px;
+        height: 2px;
+        background: black;
+        border: none;
+        outline: none;
+        }
+        .slider input[type="range"]::-webkit-slider-thumb {
+        -webkit-appearance: none !important;
+        width: 30px;
+        height:30px;
+        background: black;
+        border: 2px solid black;
+        border-radius: 50%;
+        cursor: pointer;
+        }
+        .slider input[type="range"]::-webkit-slider-thumb:hover {
+        background: black;
+        }
+    </style>
+</head>
+<body>
+<div id="container"></div>
+<div class="slider">
+    <input type="range" id="rng" min="1" max="12" value="1" step = "1" oninput="rangeValue.innerText = this.value" onchange = "updatePrices()"><span id="rngOutput"></span>
+    <script>
+    const price_data = "calendar_ts.json"
+    var myRange = ["x","Jan", "Feb", "Mar", "Apr", "May", "June", "Jul", "Aug", "Sept", "Oct", "Nov", "Dec"]
+    var rng = document.getElementById("rng");
+    var ro = document.getElementById("rngOutput");
+
+    function updateRange(){
+    ro.textContent = myRange[parseInt(rng.value, 10)];
+    console.log("Selected value is: " + myRange[parseInt(rng.value, 10)] + ", Associated value is: " + rng.value);
+    };
+
+    window.addEventListener("DOMContentLoaded", updateRange);
+    rng.addEventListener("input", updateRange);
+    let prices = []
+
+    function updatePrices(){
+        console.log("LEM")
+        Promise.all(
+            [
+                d3.json(price_data)
+            ]).then(d => {
+                console.log(d)
+                let x = d[0]
+                var prices = x.filter(x => (x.Month).toString() === rng.value)
+                console.log(rng.value)
+                console.log(prices)
+
+                const scatterplotLayer = new ScatterplotLayer({
+                    data: prices,
+                    visible: true,
+                    pickable: true,
+                    opacity: 0.8,
+                    stroked: true,
+                    filled: true,
+                    radiusScale: 2,
+                    lineWidthMinPixels:0,
+                    getPosition: d => [d.long,d.lat],
+                    getFillColor: d=>[0, 128, 255],
+                    getRadius: d => (d.price)/1800,                    
+                    
+                });
+
+                deckgl.setProps({
+                    layers: [geojsonLayer, scatterplotLayer],
+                    getTooltip: ({object}) => object && {
+                        html: `<h2>${object.Name}</h2>
+                        <div>$${object.price}</div>
+                        <div>${object.bathroom}</div>
+                        <div>${object.bed} bedroom</div>`,
+                        style: {
+                        backgroundColor: '#13580E',
+                        fontSize: '0.8em'
+                        }
+                    }
+                });
+
+            });
+    }
+    
+    </script>
+</div>
+</body>
+    <script>
+        const {DeckGL, GeoJsonLayer, ScatterplotLayer} = deck;
+             const geojsonLayer = new GeoJsonLayer({
+             data: 'Boston_Airbnb_Num.geojson',
+             stroked: true,
+             filled: true,
+             opacity:.5,
+             getLineColor: [0, 0, 0],
+             lineWidthMinPixels: .5,
+             getFillColor: d=> color(d['properties']['num_airbnbs']),
+         });
+     
+         const deckgl = new DeckGL({
+             mapboxApiAccessToken:token,
+             mapStyle:'mapbox://styles/mapbox/streets-v11',
+             container: "container",
+             initialViewState: {
+                 latitude: 42.3601,
+                 longitude: -71.0589,
+                 zoom: 12,
+                 maxZoom: 16
+             },
+             controller: true,
+            layers: [geojsonLayer],
+         });
+     
+         function color(population, min=0, max=600){
+             let colorInterpolator = d3.interpolateRgbBasis(["#DAF7A6", "FFC300", "#FF5733", "#581845 "])
+             let logScale = d3.scaleLinear()
+                 .domain([min,max])
+             let hexColor = colorInterpolator(logScale(population))
+             let rgbColor = d3.rgb(hexColor)
+             return [rgbColor.r,rgbColor.g,rgbColor.b];
+         }
+     </script>
+
+
+</html>
